@@ -17,11 +17,6 @@ class Divider
     end
   end
 
-  
-  # when pulling from the next group up
-  # if the time it would take the slower machine to do the task
-  # is one order of magnitude greater than the current elapsed time
-  # of the faster computer, then don't take the task, and continue looking below
   def completion_time
     groups = generate_groups
     totals = Hash.new()
@@ -32,7 +27,6 @@ class Divider
     # initially give each machine the largest from their group
     @m.times do |i|
       if totals[i].nil?
-        puts "#{i} taking #{groups[i][-1]}"
         totals[i] = groups[i].pop / (@speeds[i] * 1.0)
         processes -= 1
       end
@@ -47,7 +41,7 @@ class Divider
       # tie breaker
       if sorted_totals[1][1] == finished_time
         i = 1
-        while sorted_totals[i][1] == finished_time
+        while sorted_totals[i] && sorted_totals[i][1] == finished_time
           i += 1
         end
         tied = []
@@ -60,19 +54,14 @@ class Divider
 
       # give that process it's next biggest
       if groups[finished].size > 0
-        puts "#{finished} taking #{groups[finished][-1]}"
         totals[finished] += groups[finished].pop / (@speeds[finished] * 1.0)
         processes -= 1
-      # only go up 1
-      # that it can go up 1
-      elsif groups[finished + 1] && groups[finished + 1].size > 0
-        puts "#{finished} going up 1"
-        puts "#{finished} taking #{groups[finished + 1][-1]}"
+      # take the smallest from the next group up
+      elsif groups[finished + 1] && groups[finished + 1].size > 0 && 
+          allowed_to_take?(finished, finished + 1, groups, totals)
         totals[finished] += groups[finished + 1].delete_at(0) / (@speeds[finished] * 1.0)
         processes -= 1
-      # go down at least 2...change this to unlimited?
-      
-      # change to while, iterate down groups
+      # take the largest from as far down as it needs to go
       else
         index = finished - 1
         operation = 0
@@ -81,32 +70,16 @@ class Divider
             totals[finished] += groups[index].pop / (@speeds[finished] * 1.0)
             operation = 1
             processes -= 1
-            index = -1
-          else
-            index -= 1
           end
+            
+          index -= 1
         end
 
+        #it didn't find a task to do, so this machine is done
         if operation == 0
           results[finished] = totals[finished]
           totals.delete(finished)
         end
-      end
-
-      elsif groups[finished - 1] && groups[finished - 1].size > 0 && finished > 0
-        puts "#{finished} going down 1"
-        puts "#{finished} taking #{groups[finished - 1][-1]}"
-        totals[finished] += groups[finished - 1].pop / (@speeds[finished] * 1.0)
-        processes -= 1
-      elsif groups[finished - 2] && groups[finished - 2].size > 0 && finished > 1
-        puts "#{finished} going down 2"
-        puts "#{finished} taking #{groups[finished - 2][-1]}"
-        totals[finished] += groups[finished - 2].pop / (@speeds[finished] * 1.0)
-        processes -= 1
-      else
-        #this guy is done, remove from pool
-        results[finished] = totals[finished]
-        totals.delete(finished)
       end
     end
 
@@ -129,6 +102,15 @@ class Divider
     end
 
     return groups
+  end
+
+  def allowed_to_take?(current_index, bigger_index, groups, totals)
+    # check to see if the time it would take to do the task is
+    # one order of magnitude more than the current elapsed time of
+    # the faster machine. If it is, take the next task.
+    time_of_task = groups[current_index + 1][0] / (@speeds[current_index] * 1.0)
+    elapsed_time = totals[bigger_index]
+    time_of_task.to_i.to_s.size <= elapsed_time.to_i.to_s.size
   end
 
   class InvalidParam < ArgumentError; end

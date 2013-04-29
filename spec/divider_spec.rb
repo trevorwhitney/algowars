@@ -69,7 +69,7 @@ describe Divider do
       end
 
       it "should find the optimal time of 30" do
-        @divider.completion_time.should == 45 #got 103
+        @divider.completion_time.should == 40
       end
     end
 
